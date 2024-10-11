@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+
+    <title>Juego Estilo Pac-Man Neon</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #111;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        #gameCanvas {
+            background-color: #222;
+            border: 2px solid #0ff;
+            box-shadow: 0 0 15px #0ff;
+        }
+        #score {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 24px;
+            color: #0ff;
+        }
+        #banner {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-family: 'Press Start 2P', cursive;
+    font-size: 20px;
+    color: #0ff;
+    text-shadow: 
+        0 0 5px #0ff, 
+        0 0 10px #0ff, 
+        0 0 15px #0ff, 
+        0 0 20px #ff00ff, 
+        0 0 30px #ff00ff, 
+        0 0 40px #ff00ff;
+}
+
+#score {
+    position: absolute;
+    top: 50px; /* Cambia la posición si es necesario */
+    left: 10px;
+    font-size: 24px;
+    color: #0ff;
+    font-family: 'Press Start 2P', cursive; /* Aplica la fuente aquí */
+    text-shadow: 
+        0 0 5px #0ff, 
+        0 0 10px #0ff, 
+        0 0 15px #0ff, 
+        0 0 20px #ff00ff, 
+        0 0 30px #ff00ff, 
+        0 0 40px #ff00ff;
+}
+
+
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="500" height="500"></canvas>
+    <div id="score">Monedas: 0</div>
+    <div id="banner">Muévete usando las teclas "A, S, W, D"</div>
+    <img id="playerImage" src="pngwing.com.png" hidden>
+    <img id="enemyImage1" src="Enemigo edit - copia.png" hidden>
+    <img id="enemyImage2" src="Enemigo edit.png" hidden>
+    <audio id="backgroundMusic" src="GigaChad 8bit Song.mp3" loop></audio>
+    <audio id="coinSound" src="Coin.mp3"></audio>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('score');
+        const backgroundMusic = document.getElementById('backgroundMusic');
+        const coinSound = document.getElementById('coinSound');
+        const tileSize = 25;
+
+        let level = 1;
+        let score = 0;
+        let gameOver = false;
+        const keys = {};
+
+        document.addEventListener('keydown', () => {
+            if (!backgroundMusic.playing) {
+                backgroundMusic.volume = 0.3;
+                backgroundMusic.play();
+            }
+        }, { once: true });
+
+        function playCoinSound() {
+            coinSound.currentTime = 0;
+            coinSound.volume = 1.0;
+            coinSound.play();
+        }
+
+        const player = {
+            x: tileSize,
+            y: tileSize,
+            width: tileSize * 1.2,
+            height: tileSize * 1.2,
+            dx: 0,
+            dy: 0,
+            speed: 4
+        };
+
+        let coins = Array.from({ length: 50 }, () => ({
+            x: Math.floor(Math.random() * 20) * tileSize,
+            y: Math.floor(Math.random() * 20) * tileSize,
+            width: tileSize - 5,
+            height: tileSize - 5,
+            color: '#0ff',
+            collected: false
+        }));
+
+        let enemies = [
+            { x: 200, y: 100, width: tileSize * 1.5, height: tileSize * 1.5, image: enemyImage1, speed: 4, dx: 1, dy: 0 },
+            { x: 300, y: 300, width: tileSize * 1.5, height: tileSize * 1.5, image: enemyImage2, speed: 4, dx: 0, dy: 1 },
+            { x: 100, y: 200, width: tileSize * 1.5, height: tileSize * 1.5, image: enemyImage1, speed: 4, dx: 1, dy: 1 }
+        ];
+
+        function drawPlayer() {
+            const playerImage = document.getElementById('playerImage');
+            ctx.drawImage(playerImage, player.x, player.y, player.width, player.height);
+        }
+
+        function drawEnemies() {
+            enemies.forEach(enemy => {
+                ctx.drawImage(enemy.image, enemy.x, enemy.y, enemy.width, enemy.height);
+                ctx.shadowColor = enemy.color;
+                ctx.shadowBlur = 10;
+            });
+        }
+
+        function drawCoins() {
+            coins.forEach(coin => {
+                if (!coin.collected) {
+                    ctx.fillStyle = coin.color;
+                    ctx.fillRect(coin.x, coin.y, coin.width, coin.height);
+                    ctx.shadowColor = coin.color;
+                    ctx.shadowBlur = 10;
+                }
+            });
+        }
+
+        function movePlayer() {
+            player.dx = 0;
+            player.dy = 0;
+            if (keys['ArrowUp'] || keys['w']) player.dy = -player.speed;
+            if (keys['ArrowDown'] || keys['s']) player.dy = player.speed;
+            if (keys['ArrowLeft'] || keys['a']) player.dx = -player.speed;
+            if (keys['ArrowRight'] || keys['d']) player.dx = player.speed;
+
+            player.x += player.dx;
+            player.y += player.dy;
+            if (player.x < 0) player.x = 0;
+            if (player.y < 0) player.y = 0;
+            if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+            if (player.y + player.height > canvas.height) player.y = canvas.height - player.height;
+        }
+
+        function moveEnemies() {
+            enemies.forEach(enemy => {
+                if (coins.length <= 7) {
+                    let diffX = player.x - enemy.x;
+                    let diffY = player.y - enemy.y;
+                    let distance = Math.sqrt(diffX * diffX + diffY * diffY);
+                    enemy.dx = (diffX / distance) * enemy.speed;
+                    enemy.dy = (diffY / distance) * enemy.speed;
+                }
+                enemy.x += enemy.dx * enemy.speed;
+                enemy.y += enemy.dy * enemy.speed;
+                if (enemy.x < 0 || enemy.x + enemy.width > canvas.width) {
+                    enemy.dx *= -1;
+                }
+                if (enemy.y < 0 || enemy.y + enemy.height > canvas.height) {
+                    enemy.dy *= -1;
+                }
+            });
+        }
+
+        function checkCollisions() {
+            let allCoinsCollected = true;
+            coins.forEach(coin => {
+                if (!coin.collected && isColliding(player, coin)) {
+                    coin.collected = true;
+                    score++;
+                    scoreDisplay.textContent = `Monedas: ${score}`;
+                    playCoinSound();
+                }
+                if (!coin.collected) {
+                    allCoinsCollected = false;
+                }
+            });
+
+            if (allCoinsCollected) {
+                if (level === 1) {
+                    advanceToLevel2();
+                } else if (level === 2) {
+                    advanceToLevel3();
+                } else {
+                    gameOver = true;
+                    alert('¡Felicidades! ¡Has completado el juego!');
+                    document.location.reload();
+                }
+                return;
+            }
+
+            enemies.forEach(enemy => {
+                if (isColliding(player, enemy)) {
+                    gameOver = true;
+                    alert('¡Has perdido! Recogiste ' + score + ' monedas.');
+                    document.location.reload();
+                }
+            });
+        }
+
+        function isColliding(a, b) {
+            return a.x < b.x + b.width &&
+                a.x + a.width > b.x &&
+                a.y < b.y + b.height &&
+                a.y + a.height > b.y;
+        }
+
+        function advanceToLevel2() {
+            alert('¡Nivel 2!');
+            level = 2;
+            player.x = 1 * tileSize;
+            player.y = 1 * tileSize;
+            enemies.forEach(enemy => enemy.speed = 5);
+            gameLoop();
+        }
+
+        function advanceToLevel3() {
+            alert('¡Nivel 3!');
+            level = 3;
+            player.x = 1 * tileSize;
+            player.y = 1 * tileSize;
+            enemies.forEach(enemy => enemy.speed = 6);
+            gameLoop();
+        }
+
+        function gameLoop() {
+            if (gameOver) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            movePlayer();
+            moveEnemies();
+            drawPlayer();
+            drawEnemies();
+            drawCoins();
+            checkCollisions();
+            requestAnimationFrame(gameLoop);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+        });
+
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        gameLoop();
+    </script>
+</body>
+</html>
